@@ -83,7 +83,7 @@ src/
 
 ```bash
 # Clone the repo
-git clone <repository-url>
+git clone https://github.com/johrell/doto.git
 cd Doto
 
 # Install dependencies
