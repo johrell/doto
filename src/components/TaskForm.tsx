@@ -80,6 +80,7 @@ export function TaskForm({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const currentTaskIdRef = useRef<string | null>(null);
 
   // Focus title input when panel opens
   useEffect(() => {
@@ -126,28 +127,36 @@ export function TaskForm({
     };
   }, [isOpen, onClose]);
 
-  // Initialize form data when task changes
+  // Initialize form data when switching to a different task
+  // Only sync when task ID changes, not when task data is updated from auto-save
   useEffect(() => {
-    if (task) {
-      setFormData({
-        title: task.title,
-        description: task.description || '',
-        externalRef: task.externalRef || '',
-        deadline: formatDateForInput(task.deadline),
-        keywords: task.keywords || [],
-        groupId: task.groupId ?? null,
-      });
-    } else {
-      setFormData({
-        title: '',
-        description: '',
-        externalRef: '',
-        deadline: '',
-        keywords: [],
-        groupId: null,
-      });
+    const newTaskId = task?.id ?? null;
+
+    // Only reset form data if we're switching to a different task
+    if (newTaskId !== currentTaskIdRef.current) {
+      currentTaskIdRef.current = newTaskId;
+
+      if (task) {
+        setFormData({
+          title: task.title,
+          description: task.description || '',
+          externalRef: task.externalRef || '',
+          deadline: formatDateForInput(task.deadline),
+          keywords: task.keywords || [],
+          groupId: task.groupId ?? null,
+        });
+      } else {
+        setFormData({
+          title: '',
+          description: '',
+          externalRef: '',
+          deadline: '',
+          keywords: [],
+          groupId: null,
+        });
+      }
+      isInitialMount.current = true;
     }
-    isInitialMount.current = true;
   }, [task]);
 
   // Auto-save in edit mode when formData changes
