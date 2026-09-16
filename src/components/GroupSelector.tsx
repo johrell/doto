@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useGroupStore } from '../stores/groupStore';
 import { useTaskStore } from '../stores/taskStore';
 import { ColorPicker } from './ColorPicker';
+import { CheckIcon, ChevronDownIcon, PlusIcon, TrashIcon } from './Icons';
 import type { Group } from '../types';
 
 /**
@@ -190,108 +191,53 @@ export function GroupSelector({ selectedGroupId, onChange }: GroupSelectorProps)
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 font-mono text-xs"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border-primary)',
-          }}
+          className="form-input flex items-center gap-2 text-left"
+          aria-haspopup="listbox"
         >
-          <span
-            className="w-3 h-3 flex-shrink-0"
-            style={{ backgroundColor: selectedGroup.color }}
-          />
-          <span className="flex-1" style={{ color: 'var(--text-primary)' }}>
+          <span className="swatch" style={{ backgroundColor: selectedGroup.color }} />
+          <span className="flex-1 truncate" style={{ color: 'var(--text-primary)' }}>
             {selectedGroup.name}
           </span>
-          <span style={{ color: 'var(--text-tertiary)' }}>[v]</span>
+          <ChevronDownIcon style={{ color: 'var(--text-tertiary)' }} />
         </button>
       ) : (
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs" style={{ color: 'var(--text-tertiary)' }}>{'>'}</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={searchQuery}
-            onChange={handleInputChange}
-            onFocus={handleInputFocus}
-            onKeyDown={handleKeyDown}
-            placeholder="search_groups..."
-            className="form-input font-mono text-xs"
-          />
-        </div>
+        <input
+          ref={inputRef}
+          type="text"
+          value={searchQuery}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+          onKeyDown={handleKeyDown}
+          placeholder="Search or add a group"
+          className="form-input"
+          aria-label="Search groups"
+        />
       )}
 
       {/* Dropdown */}
       {isOpen && (
-        <div
-          className="absolute z-50 w-full mt-2 overflow-hidden animate-scale-in"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-primary)',
-            boxShadow: '4px 4px 0 var(--border-secondary)',
-          }}
-        >
+        <div className="menu left-0 animate-scale-in" style={{ minWidth: '100%', width: 'max-content', maxWidth: 320 }}>
           {isCreating ? (
             /* Create New Group Form */
-            <div className="p-4">
-              <div className="mb-3">
-                <label
-                  className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'// new_group'}
-                </label>
-                <div
-                  className="flex items-center gap-2 px-3 py-2 font-mono text-xs"
-                  style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-primary)',
-                  }}
-                >
-                  <span
-                    className="w-3 h-3 flex-shrink-0"
-                    style={{ backgroundColor: newGroupColor }}
-                  />
-                  <span style={{ color: 'var(--text-primary)' }}>{searchQuery.trim()}</span>
-                </div>
+            <div className="menu-section">
+              <div className="flex items-center gap-2">
+                <span className="swatch" style={{ backgroundColor: newGroupColor }} />
+                <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{searchQuery.trim()}</span>
               </div>
-
-              <div className="mb-4">
-                <label
-                  className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'// color'}
-                </label>
+              <div>
+                <span className="field-label">Color</span>
                 <ColorPicker selectedColor={newGroupColor} onChange={setNewGroupColor} />
               </div>
-
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsCreating(false);
-                    setSearchQuery('');
-                  }}
-                  className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors duration-200"
-                  style={{
-                    color: 'var(--text-secondary)',
-                    border: '1px solid var(--border-primary)',
-                  }}
+                  onClick={() => { setIsCreating(false); setSearchQuery(''); }}
+                  className="btn btn-sm"
                 >
-                  [ESC]
+                  Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCreateGroup}
-                  className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-all duration-200"
-                  style={{
-                    backgroundColor: 'var(--text-primary)',
-                    color: 'var(--bg-primary)',
-                    border: '1px solid var(--text-primary)',
-                  }}
-                >
-                  [CREATE]
+                <button type="button" onClick={handleCreateGroup} className="btn btn-primary btn-sm">
+                  Create
                 </button>
               </div>
             </div>
@@ -300,35 +246,17 @@ export function GroupSelector({ selectedGroupId, onChange }: GroupSelectorProps)
             <div className="max-h-64 overflow-y-auto">
               {/* Clear Selection Option */}
               {selectedGroupId && (
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 transition-colors duration-150 text-left border-b font-mono text-xs"
-                  style={{ borderColor: 'var(--border-primary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span
-                    className="w-3 h-3 flex-shrink-0 border"
-                    style={{ borderColor: 'var(--text-tertiary)' }}
-                  />
-                  <span style={{ color: 'var(--text-tertiary)' }}>
-                    {'// no_group'}
-                  </span>
-                </button>
+                <>
+                  <button type="button" onClick={handleClearSelection} className="menu-item">
+                    <span className="swatch" style={{ border: '1px solid var(--border-secondary)' }} />
+                    <span style={{ color: 'var(--text-secondary)' }}>No group</span>
+                  </button>
+                  <div className="menu-divider" />
+                </>
               )}
 
               {filteredGroups.length === 0 && !searchQuery.trim() ? (
-                <div
-                  className="px-4 py-6 text-center font-mono text-xs"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'// no groups. type to create.'}
-                </div>
+                <div className="menu-empty">No groups yet. Type to create one.</div>
               ) : (
                 <>
                   {filteredGroups.map((group) => {
@@ -338,49 +266,20 @@ export function GroupSelector({ selectedGroupId, onChange }: GroupSelectorProps)
 
                     if (isEditing) {
                       return (
-                        <div
-                          key={group.id}
-                          className="px-4 py-3 border-b"
-                          style={{ borderColor: 'var(--border-primary)' }}
-                        >
-                          <div className="flex items-center gap-2 mb-3">
-                            <span
-                              className="w-3 h-3 flex-shrink-0"
-                              style={{ backgroundColor: editingColor }}
-                            />
+                        <div key={group.id} className="menu-section" style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="swatch" style={{ backgroundColor: editingColor }} />
                             <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>
                               @{group.name}
                             </span>
                           </div>
-                          <div className="mb-3">
-                            <ColorPicker
-                              selectedColor={editingColor}
-                              onChange={setEditingColor}
-                            />
-                          </div>
+                          <ColorPicker selectedColor={editingColor} onChange={setEditingColor} />
                           <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditingGroupId(null)}
-                              className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider"
-                              style={{
-                                color: 'var(--text-secondary)',
-                                border: '1px solid var(--border-primary)',
-                              }}
-                            >
-                              [ESC]
+                            <button type="button" onClick={() => setEditingGroupId(null)} className="btn btn-sm">
+                              Cancel
                             </button>
-                            <button
-                              type="button"
-                              onClick={handleSaveEdit}
-                              className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider"
-                              style={{
-                                backgroundColor: 'var(--text-primary)',
-                                color: 'var(--bg-primary)',
-                                border: '1px solid var(--text-primary)',
-                              }}
-                            >
-                              [SAVE]
+                            <button type="button" onClick={handleSaveEdit} className="btn btn-primary btn-sm">
+                              Save
                             </button>
                           </div>
                         </div>
@@ -388,60 +287,38 @@ export function GroupSelector({ selectedGroupId, onChange }: GroupSelectorProps)
                     }
 
                     return (
-                      <div
-                        key={group.id}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 transition-colors duration-150 font-mono text-xs"
-                        style={{
-                          backgroundColor: isSelected ? 'var(--bg-secondary)' : 'transparent',
-                          borderLeft: isSelected ? '2px solid var(--accent-done)' : '2px solid transparent',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                      >
+                      <div key={group.id} className="menu-item" data-active={isSelected}>
                         <button
                           type="button"
                           onClick={() => handleStartEdit(group)}
-                          className="w-3 h-3 flex-shrink-0 hover:ring-2 hover:ring-offset-1 transition-all"
-                          style={{ backgroundColor: group.color }}
+                          className="swatch hover:ring-2 hover:ring-offset-1 transition-all"
+                          style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: group.color }}
                           title="Edit color"
+                          aria-label={'Edit color of ' + group.name}
                         />
                         <button
                           type="button"
                           onClick={() => handleSelectGroup(group.id)}
-                          className="flex-1 text-left"
+                          className="flex-1 text-left truncate"
                           style={{ color: 'var(--text-primary)' }}
                         >
-                          @{group.name}
+                          {group.name}
                         </button>
-                        <span
-                          className="font-mono text-[10px]"
-                          style={{ color: 'var(--text-tertiary)' }}
-                        >
-                          ({usageCount})
-                        </span>
-                        {isSelected && (
-                          <span
-                            className="font-mono text-[10px]"
-                            style={{ color: 'var(--accent-done)' }}
-                          >
-                            [SELECTED]
-                          </span>
+                        {isSelected ? (
+                          <CheckIcon style={{ color: 'var(--accent-done)' }} />
+                        ) : (
+                          <span className="side-count" style={{ marginLeft: 0 }}>{usageCount}</span>
                         )}
                         {usageCount === 0 && !isSelected && (
                           <button
                             type="button"
                             onClick={() => handleDeleteGroup(group.id)}
-                            className="font-mono text-[10px] hover:opacity-80 transition-opacity"
-                            style={{ color: '#ff4444' }}
+                            className="icon-btn icon-btn-danger"
+                            style={{ width: 24, height: 24 }}
                             title="Delete unused group"
+                            aria-label={'Delete ' + group.name}
                           >
-                            [DEL]
+                            <TrashIcon size={14} />
                           </button>
                         )}
                       </div>
@@ -450,25 +327,13 @@ export function GroupSelector({ selectedGroupId, onChange }: GroupSelectorProps)
 
                   {/* Create New Option */}
                   {searchQuery.trim() && !exactMatchExists && (
-                    <button
-                      type="button"
-                      onClick={handleShowCreateForm}
-                      className="w-full px-4 py-2.5 flex items-center gap-2 transition-colors duration-150 text-left border-t font-mono text-xs"
-                      style={{
-                        borderColor: 'var(--border-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <span style={{ color: 'var(--accent-done)' }}>[+]</span>
-                      <span style={{ color: 'var(--text-primary)' }}>
-                        create {searchQuery.trim()}
-                      </span>
-                    </button>
+                    <>
+                      {filteredGroups.length > 0 && <div className="menu-divider" />}
+                      <button type="button" onClick={handleShowCreateForm} className="menu-item">
+                        <PlusIcon style={{ color: 'var(--accent-done)' }} />
+                        <span>Create {searchQuery.trim()}</span>
+                      </button>
+                    </>
                   )}
                 </>
               )}

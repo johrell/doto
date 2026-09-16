@@ -22,7 +22,8 @@ Doto runs entirely in your browser. No accounts. No servers. No network requests
 - **Quick-add** with hashtag parsing (`Fix bug #urgent #backend @frontend`)
 - **Keywords** (multiple per task) and **Groups** (one per task) for organization
 - **Projects** to separate different workstreams
-- **Dark/light themes** with a retro terminal aesthetic
+- **Export/import** JSON backups to move all your data between browsers or computers
+- **Dark/light themes** with a clean, high-contrast interface
 - **Keyboard shortcuts** (Enter to quick-add, Escape to close forms)
 
 ## How It Works
@@ -128,14 +129,13 @@ Fix login bug #urgent #backend @api-team
 
 ## Data Backup
 
-Since data is in localStorage, you can back it up manually:
+1. Click **Export backup** in the sidebar to download a JSON backup.
+2. Move the file to your other computer, or open Doto in another browser.
+3. Click **Import backup** in the sidebar, select the backup, and confirm the replacement.
 
-1. Open browser DevTools (F12)
-2. Go to Application > Local Storage
-3. Find the `doto-*` keys
-4. Copy the values to a safe location
+Backups include every project, task, keyword, group, task order, and your theme preference. Import replaces all existing Doto data in the destination browser and reloads the app. Export the destination's data first if you want to keep a copy. Invalid or unsupported backup files are rejected before any data is changed.
 
-To restore, paste the values back into the same keys.
+The backup is a plain JSON file containing your task data. Store and transfer it as you would the original information; no data is uploaded by Doto.
 
 ## License
 

@@ -21,5 +21,5 @@ export type { KeywordSelectorProps } from './KeywordSelector';
 export { GroupSelector } from './GroupSelector';
 export type { GroupSelectorProps } from './GroupSelector';
 
-export { ProjectDropdown } from './ProjectDropdown';
-export type { ProjectDropdownProps } from './ProjectDropdown';
+export { ProjectList } from './ProjectList';
+export type { ProjectListProps } from './ProjectList';

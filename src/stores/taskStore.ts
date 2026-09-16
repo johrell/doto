@@ -18,6 +18,8 @@ interface TaskState {
  * Task store actions
  */
 interface TaskActions {
+  /** Restore a deleted task at its previous position without replacing other tasks. */
+  restoreTask: (task: Task, allIndex: number, statusIndex: number) => void;
   /** Add a new task to the store */
   addTask: (input: CreateTaskInput) => Task;
   /** Update an existing task */
@@ -94,6 +96,21 @@ export const useTaskStore = create<TaskStore>()(
     (set, get) => ({
       ...initialState,
 
+      restoreTask: (task, allIndex, statusIndex) => {
+        if (get().byId[task.id]) return;
+        set((state) => {
+          const allIds = [...state.allIds];
+          const statusIds = [...state.orderByStatus[task.status]];
+          allIds.splice(Math.max(0, allIndex), 0, task.id);
+          statusIds.splice(Math.max(0, statusIndex), 0, task.id);
+          return {
+            byId: { ...state.byId, [task.id]: task },
+            allIds,
+            orderByStatus: { ...state.orderByStatus, [task.status]: statusIds },
+          };
+        });
+      },
+
       addTask: (input: CreateTaskInput): Task => {
         const id = generateId();
         const now = new Date().toISOString();
@@ -117,10 +134,10 @@ export const useTaskStore = create<TaskStore>()(
 
         set((state) => ({
           byId: { ...state.byId, [id]: task },
-          allIds: [...state.allIds, id],
+          allIds: [id, ...state.allIds],
           orderByStatus: {
             ...state.orderByStatus,
-            [task.status]: [...state.orderByStatus[task.status], id],
+            [task.status]: [id, ...state.orderByStatus[task.status]],
           },
         }));
 

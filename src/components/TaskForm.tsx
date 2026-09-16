@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { KeywordSelector } from './KeywordSelector';
 import { GroupSelector } from './GroupSelector';
-import type { Task, CreateTaskInput } from '../types';
+import { COLUMN_CONFIG } from '../config/columns';
+import { LinkIcon, TrashIcon, XIcon } from './Icons';
+import type { Task, CreateTaskInput, Status } from '../types';
 
 /**
  * Props for the TaskForm component
@@ -17,6 +19,8 @@ export interface TaskFormProps {
   onSave: (data: CreateTaskInput) => void;
   /** Callback when delete is requested (edit mode only) */
   onDelete?: () => void;
+  /** Callback when the status is changed from the panel (edit mode only) */
+  onStatusChange?: (status: Status) => void;
   /** Title for the form header */
   title?: string;
 }
@@ -43,6 +47,24 @@ function formatDateForInput(dateString: string | null): string {
 }
 
 /**
+ * Format a date for display in the timeline
+ */
+function formatDisplayDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Whole days a deadline is past, 0 when not overdue
+ */
+function getOverdueDays(deadline: string): number {
+  const now = new Date();
+  const deadlineDate = new Date(deadline);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const deadlineDay = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
+  return Math.max(0, Math.round((today.getTime() - deadlineDay.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+/**
  * Debounce delay for auto-save (ms)
  */
 const AUTO_SAVE_DELAY = 500;
@@ -59,10 +81,11 @@ export function TaskForm({
   onClose,
   onSave,
   onDelete,
+  onStatusChange,
   title,
 }: TaskFormProps) {
   const isEditMode = !!task;
-  const displayTitle = title ?? (isEditMode ? 'Task Properties' : 'New Task');
+  const displayTitle = title ?? (isEditMode ? 'Edit task' : 'New task');
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
@@ -260,233 +283,173 @@ export function TaskForm({
 
   if (!isOpen) return null;
 
+  const timeline: string[] = [];
+  if (isEditMode && task) {
+    timeline.push('Created ' + formatDisplayDate(task.dateCreated));
+    if (task.dateStarted) timeline.push('Started ' + formatDisplayDate(task.dateStarted));
+    if (task.dateCompleted) timeline.push('Completed ' + formatDisplayDate(task.dateCompleted));
+  }
+  const overdueDays = isEditMode && task && task.deadline && !task.dateCompleted ? getOverdueDays(task.deadline) : 0;
+
   return (
     <div
       ref={panelRef}
-      className="fixed top-0 right-0 bottom-0 z-40 w-full max-w-md animate-slide-in-right"
+      className="panel animate-slide-in-right"
       onKeyDown={handleKeyDown}
       role="region"
       aria-labelledby="task-form-title"
     >
-      {/* Panel */}
-      <div
-        className="h-full overflow-y-auto"
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          borderLeft: '1px solid var(--border-primary)',
-          boxShadow: 'var(--shadow-lg)',
-        }}
-      >
-        {/* Header */}
-        <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border-primary)',
-          }}
-        >
-          <h2
-            id="task-form-title"
-            className="font-mono text-sm uppercase tracking-wide"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {'// '}{displayTitle}
-          </h2>
-          <button
-            onClick={onClose}
-            className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors duration-200"
-            style={{
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border-primary)',
-            }}
-            aria-label="Close panel"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            [ESC]
-          </button>
+      {/* Header */}
+      <div className="panel-header">
+        <h2 id="task-form-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {displayTitle}
+        </h2>
+        <button type="button" onClick={onClose} className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Close panel" title="Close (Esc)">
+          <XIcon />
+        </button>
+      </div>
+
+      {/* Form */}
+      <div className="panel-body">
+        {/* Status (edit mode only) */}
+        {isEditMode && task && onStatusChange && (
+          <div className="segmented" role="group" aria-label="Status">
+            {COLUMN_CONFIG.map((column) => (
+              <button
+                key={column.status}
+                type="button"
+                className="segment"
+                aria-pressed={task.status === column.status}
+                onClick={() => task.status !== column.status && onStatusChange(column.status)}
+              >
+                <span className="swatch" style={{ borderRadius: '50%', backgroundColor: 'var(' + column.accentVar + ')' }} />
+                {column.title}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Title Field */}
+        <div>
+          <label htmlFor="task-title" className="field-label">
+            Title{!isEditMode && <span style={{ color: 'var(--danger)' }}> *</span>}
+          </label>
+          <input
+            ref={titleInputRef}
+            id="task-title"
+            type="text"
+            value={formData.title}
+            onChange={handleChange('title')}
+            onKeyDown={handleTitleKeyDown}
+            placeholder="What needs doing?"
+            className="form-input"
+          />
         </div>
 
-        {/* Form */}
-        <div className="p-6 space-y-5">
-          {/* Title Field */}
-          <div>
-            <label
-              htmlFor="task-title"
-              className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// title'} {!isEditMode && <span style={{ color: '#ff4444' }}>*</span>}
-            </label>
-            <input
-              ref={titleInputRef}
-              id="task-title"
-              type="text"
-              value={formData.title}
-              onChange={handleChange('title')}
-              onKeyDown={handleTitleKeyDown}
-              placeholder="enter_task_title..."
-              className="form-input font-mono text-sm"
-            />
-          </div>
+        {/* Description Field */}
+        <div>
+          <label htmlFor="task-description" className="field-label">Description</label>
+          <textarea
+            ref={descriptionInputRef}
+            id="task-description"
+            value={formData.description}
+            onChange={handleChange('description')}
+            placeholder="Add details, links or notes"
+            className="form-input"
+            rows={4}
+          />
+        </div>
 
-          {/* Description Field */}
-          <div>
-            <label
-              htmlFor="task-description"
-              className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// description'}
-            </label>
-            <textarea
-              ref={descriptionInputRef}
-              id="task-description"
-              value={formData.description}
-              onChange={handleChange('description')}
-              placeholder="add_description..."
-              className="form-input font-mono text-sm"
-              rows={4}
-            />
-          </div>
+        {/* Keywords Field */}
+        <div>
+          <span className="field-label">Keywords</span>
+          <KeywordSelector
+            selectedKeywordIds={formData.keywords}
+            onChange={handleKeywordsChange}
+          />
+        </div>
 
-          {/* Keywords Field */}
-          <div>
-            <label
-              className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// keywords'}
-            </label>
-            <KeywordSelector
-              selectedKeywordIds={formData.keywords}
-              onChange={handleKeywordsChange}
-            />
-          </div>
-
-          {/* Group Field */}
-          <div>
-            <label
-              className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// group'}
-            </label>
+        {/* Group and Deadline */}
+        <div className="grid grid-cols-2 gap-3.5">
+          <div className="min-w-0">
+            <span className="field-label">Group</span>
             <GroupSelector
               selectedGroupId={formData.groupId}
               onChange={handleGroupChange}
             />
           </div>
-
-          {/* External Reference Field */}
-          <div>
-            <label
-              htmlFor="task-external-ref"
-              className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// external_ref'}
-            </label>
-            <input
-              id="task-external-ref"
-              type="text"
-              value={formData.externalRef}
-              onChange={handleChange('externalRef')}
-              placeholder="https://github.com/issue/123"
-              className="form-input font-mono text-sm"
-            />
-            <p className="mt-1.5 font-mono text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-              {'// link to external ticket or issue'}
-            </p>
-          </div>
-
-          {/* Deadline Field */}
-          <div>
-            <label
-              htmlFor="task-deadline"
-              className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// deadline'}
-            </label>
+          <div className="min-w-0">
+            <label htmlFor="task-deadline" className="field-label">Deadline</label>
             <input
               id="task-deadline"
               type="date"
               value={formData.deadline}
               onChange={handleChange('deadline')}
-              className="form-input font-mono text-sm"
+              className="form-input"
+              style={overdueDays > 0 ? { color: 'var(--danger)' } : undefined}
             />
           </div>
-
-          {/* Read-only info for edit mode */}
-          {isEditMode && task && (
-            <div
-              className="pt-4 border-t"
-              style={{ borderColor: 'var(--border-primary)' }}
-            >
-              <p className="font-mono text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-                {'// created: '}{new Date(task.dateCreated).toLocaleDateString()}
-                {task.dateCompleted && (
-                  <>{' | completed: '}{new Date(task.dateCompleted).toLocaleDateString()}</>
-                )}
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Footer Actions */}
-        <div
-          className="sticky bottom-0 flex items-center justify-between px-6 py-4 border-t"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border-primary)',
-          }}
-        >
-          {/* Delete button (edit mode only) */}
-          {isEditMode && onDelete ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all duration-200"
-              style={{
-                color: '#ff4444',
-                border: '1px solid #ff4444',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 68, 68, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              [DELETE]
-            </button>
-          ) : (
-            <div />
-          )}
-
-          {/* Create button (create mode only) */}
-          {!isEditMode && (
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={!formData.title.trim()}
-              className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all duration-200 hover:-translate-x-0.5 hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0"
-              style={{
-                backgroundColor: 'var(--text-primary)',
-                color: 'var(--bg-primary)',
-                border: '1px solid var(--text-primary)',
-                boxShadow: '2px 2px 0 var(--border-secondary)',
-              }}
-            >
-              [CREATE TASK]
-            </button>
-          )}
+        {/* External Reference Field */}
+        <div>
+          <label htmlFor="task-external-ref" className="field-label">External reference</label>
+          <div className="relative">
+            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
+            <input
+              id="task-external-ref"
+              type="text"
+              value={formData.externalRef}
+              onChange={handleChange('externalRef')}
+              placeholder="Ticket number or issue link"
+              className="form-input"
+              style={{ paddingLeft: 36 }}
+            />
+          </div>
         </div>
+
+        {/* Timeline (edit mode only) */}
+        {isEditMode && task && (
+          <div className="info-box">
+            <span className="field-label" style={{ marginBottom: 0 }}>Timeline</span>
+            <span>{timeline.join(' · ')}</span>
+            {overdueDays > 0 && (
+              <span style={{ color: 'var(--danger)' }}>
+                Overdue by {overdueDays} {overdueDays === 1 ? 'day' : 'days'}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer Actions */}
+      <div className="panel-footer">
+        {isEditMode ? (
+          <span className="meta">
+            <span className="swatch" style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent-done)' }} />
+            Saved automatically
+          </span>
+        ) : (
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Esc to cancel</span>
+        )}
+
+        {isEditMode && onDelete && (
+          <button type="button" onClick={onDelete} className="btn btn-danger btn-sm">
+            <TrashIcon />
+            Delete task
+          </button>
+        )}
+
+        {!isEditMode && (
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={!formData.title.trim()}
+            className="btn btn-primary"
+          >
+            Create task
+          </button>
+        )}
       </div>
     </div>
   );

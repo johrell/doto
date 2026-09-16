@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useKeywordStore } from '../stores/keywordStore';
 import { useGroupStore } from '../stores/groupStore';
+import { PlusIcon } from './Icons';
 
 export interface QuickAddInputProps {
   onSubmit: (input: string) => void;
@@ -260,89 +261,48 @@ export const QuickAddInput = forwardRef<QuickAddInputHandle, QuickAddInputProps>
   }, []);
 
   return (
-    <div className="mb-4 relative">
-      <div
-        className="flex items-center gap-2 rounded-md px-3 py-2.5"
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-primary)',
-          boxShadow: '2px 2px 0 var(--border-secondary)',
-        }}
-      >
-        <span className="font-mono text-sm" style={{ color: 'var(--accent-todo)' }}>
-          {'>'}
-        </span>
+    <div className="relative">
+      <div className="quick-add">
+        <PlusIcon />
         <input
           ref={inputRef}
           type="text"
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="task #tag @group..."
-          className="flex-1 bg-transparent outline-none text-sm font-mono"
-          style={{ color: 'var(--text-primary)' }}
+          placeholder="Add a task… #tag @group"
+          aria-label="Add a task"
         />
-        {text.trim() && (
-          <button
-            onClick={handleSubmit}
-            className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors"
-            style={{
-              backgroundColor: 'var(--text-primary)',
-              color: 'var(--bg-primary)',
-              border: '1px solid var(--text-primary)',
-            }}
-          >
-            [ENTER]
+        {text.trim() ? (
+          <button type="button" onClick={handleSubmit} className="btn btn-primary btn-sm" style={{ height: 28 }}>
+            Add
           </button>
+        ) : (
+          <span className="kbd" aria-hidden="true">↵</span>
         )}
       </div>
 
       {/* Autocomplete Dropdown */}
       {autocomplete && totalItems > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute z-50 left-0 right-0 mt-1 overflow-hidden animate-scale-in"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-primary)',
-            boxShadow: '4px 4px 0 var(--border-secondary)',
-          }}
-        >
-          <div
-            className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider border-b"
-            style={{
-              color: 'var(--text-tertiary)',
-              borderColor: 'var(--border-primary)',
-              backgroundColor: 'var(--bg-secondary)',
-            }}
-          >
-            {autocomplete.type === 'keyword' ? '// keywords' : '// groups'}
+        <div ref={dropdownRef} className="menu left-0 right-0 animate-scale-in" role="listbox">
+          <div className="menu-heading">
+            {autocomplete.type === 'keyword' ? 'Keywords' : 'Groups'}
           </div>
           {suggestions.map((suggestion, index) => (
             <button
               key={suggestion.id}
               type="button"
+              role="option"
+              aria-selected={index === autocomplete.selectedIndex}
               onClick={() => handleSelectSuggestion(suggestion)}
-              className="w-full px-3 py-2 flex items-center gap-2 text-left font-mono text-xs transition-colors"
-              style={{
-                backgroundColor:
-                  index === autocomplete.selectedIndex
-                    ? 'var(--bg-secondary)'
-                    : 'transparent',
-                borderLeft:
-                  index === autocomplete.selectedIndex
-                    ? '2px solid var(--accent-done)'
-                    : '2px solid transparent',
-              }}
+              className="menu-item"
+              data-active={index === autocomplete.selectedIndex}
               onMouseEnter={() =>
                 setAutocomplete((prev) => (prev ? { ...prev, selectedIndex: index } : null))
               }
             >
-              <span
-                className="w-3 h-3 flex-shrink-0"
-                style={{ backgroundColor: suggestion.color }}
-              />
-              <span style={{ color: 'var(--text-primary)' }}>
+              <span className="swatch" style={{ backgroundColor: suggestion.color }} />
+              <span>
                 {autocomplete.type === 'keyword' ? '#' : '@'}
                 {suggestion.name}
               </span>
@@ -350,33 +310,28 @@ export const QuickAddInput = forwardRef<QuickAddInputHandle, QuickAddInputProps>
           ))}
           {/* Create new option */}
           {canCreate && (
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="w-full px-3 py-2 flex items-center gap-2 text-left font-mono text-xs transition-colors border-t"
-              style={{
-                borderColor: 'var(--border-primary)',
-                backgroundColor:
-                  autocomplete.selectedIndex === suggestions.length
-                    ? 'var(--bg-secondary)'
-                    : 'transparent',
-                borderLeft:
-                  autocomplete.selectedIndex === suggestions.length
-                    ? '2px solid var(--accent-done)'
-                    : '2px solid transparent',
-              }}
-              onMouseEnter={() =>
-                setAutocomplete((prev) =>
-                  prev ? { ...prev, selectedIndex: suggestions.length } : null
-                )
-              }
-            >
-              <span style={{ color: 'var(--accent-done)' }}>[+]</span>
-              <span style={{ color: 'var(--text-primary)' }}>
-                create {autocomplete.type === 'keyword' ? '#' : '@'}
-                {autocomplete.query}
-              </span>
-            </button>
+            <>
+              {suggestions.length > 0 && <div className="menu-divider" />}
+              <button
+                type="button"
+                role="option"
+                aria-selected={autocomplete.selectedIndex === suggestions.length}
+                onClick={handleCreate}
+                className="menu-item"
+                data-active={autocomplete.selectedIndex === suggestions.length}
+                onMouseEnter={() =>
+                  setAutocomplete((prev) =>
+                    prev ? { ...prev, selectedIndex: suggestions.length } : null
+                  )
+                }
+              >
+                <PlusIcon style={{ color: 'var(--accent-done)' }} />
+                <span>
+                  Create {autocomplete.type === 'keyword' ? '#' : '@'}
+                  {autocomplete.query}
+                </span>
+              </button>
+            </>
           )}
         </div>
       )}

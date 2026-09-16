@@ -3,24 +3,18 @@ import type { Status } from '../types';
 export const COLUMN_CONFIG = [
   {
     status: 'todo' as Status,
-    title: 'TODO',
-    subtitle: '// waiting to begin',
+    title: 'To do',
     accentVar: '--accent-todo',
-    icon: '[ ]'
   },
   {
     status: 'inProgress' as Status,
-    title: 'IN_PROGRESS',
-    subtitle: '// currently working',
+    title: 'In progress',
     accentVar: '--accent-progress',
-    icon: '[~]'
   },
   {
     status: 'finished' as Status,
-    title: 'DONE',
-    subtitle: '// completed tasks',
+    title: 'Done',
     accentVar: '--accent-done',
-    icon: '[x]'
   },
 ] as const;
 
