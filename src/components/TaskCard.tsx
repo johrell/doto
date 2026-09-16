@@ -1,4 +1,5 @@
 import type { Task, Keyword, Group } from '../types';
+import { AlertIcon, CheckIcon, ClockIcon, PlayIcon } from './Icons';
 
 function getDaysInProgress(dateStarted: string, endDate?: string): number {
   const start = new Date(dateStarted);
@@ -11,7 +12,7 @@ function getDaysInProgress(dateStarted: string, endDate?: string): number {
 }
 
 function getDaysInProgressLabel(days: number, forCompleted = false): string {
-  if (days === 0) return forCompleted ? '< 1 day' : 'started today';
+  if (days === 0) return forCompleted ? '< 1 day' : 'Started today';
   if (days === 1) return '1 day';
   return `${days} days`;
 }
@@ -29,7 +30,6 @@ function getDeadlineStatus(deadline: string): DeadlineStatus {
   const now = new Date();
   const deadlineDate = new Date(deadline);
 
-  // Reset time to compare dates only
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const deadlineDay = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
 
@@ -44,8 +44,8 @@ function getDeadlineStatus(deadline: string): DeadlineStatus {
 }
 
 function getDeadlineLabel(deadline: string, status: DeadlineStatus): string {
-  if (status === 'today') return 'due today';
-  if (status === 'tomorrow') return 'due tomorrow';
+  if (status === 'today') return 'Due today';
+  if (status === 'tomorrow') return 'Due tomorrow';
 
   if (status === 'overdue') {
     const now = new Date();
@@ -54,11 +54,26 @@ function getDeadlineLabel(deadline: string, status: DeadlineStatus): string {
     const deadlineDay = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
     const diffDays = Math.round((today.getTime() - deadlineDay.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 1) return 'yesterday';
+    if (diffDays === 1) return 'Yesterday';
     if (diffDays <= 6) return `${diffDays} days ago`;
   }
 
   return formatDate(deadline);
+}
+
+function DeadlineChip({ deadline }: { deadline: string }) {
+  const status = getDeadlineStatus(deadline);
+  const label = getDeadlineLabel(deadline, status);
+  const isOverdue = status === 'overdue';
+  const isSoon = status === 'soon' || status === 'today' || status === 'tomorrow';
+  const className = 'meta' + (isOverdue ? ' meta-overdue' : isSoon ? ' meta-soon' : '');
+
+  return (
+    <span className={className}>
+      {isOverdue ? <AlertIcon /> : <ClockIcon />}
+      {label}
+    </span>
+  );
 }
 
 export interface TaskCardProps {
@@ -70,153 +85,66 @@ export interface TaskCardProps {
   onClick?: () => void;
 }
 
-export function TaskCard({ task, keywords, group, isDragging, index = 0, onClick }: TaskCardProps) {
+export function TaskCard({ task, keywords, group, isDragging, onClick }: TaskCardProps) {
+  const isDone = task.status === 'finished';
+  const showStarted = task.status === 'inProgress' && task.dateStarted;
+  const showDeadline = task.deadline && !task.dateCompleted;
+  const hasMeta = showStarted || showDeadline || task.dateCompleted;
+
   return (
     <div
       data-task-card
-      className={'rounded-md cursor-grab active:cursor-grabbing card-hover animate-slide-up overflow-hidden' + (onClick ? ' cursor-pointer' : '')}
-      style={{
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-primary)',
-        boxShadow: isDragging ? 'var(--shadow-lg), 0 0 20px rgba(57, 255, 20, 0.2)' : '2px 2px 0 var(--border-secondary)',
-        transform: isDragging ? 'rotate(2deg) scale(1.02)' : undefined,
-        animationDelay: (index * 0.03) + 's',
-        opacity: 0
-      }}
+      className={'card' + (isDone ? ' card-done' : '') + (isDragging ? ' card-dragging' : '')}
       onClick={onClick}
     >
-      <div className="flex">
-        {/* Group color bar */}
-        {group && (
-          <div
-            className="w-1 flex-shrink-0"
-            style={{ backgroundColor: group.color }}
-          />
-        )}
-        <div className="flex-1 p-4">
-          <h3
-            className="font-mono font-medium text-sm leading-snug"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {task.title}
-          </h3>
+      {group && (
+        <div className="card-eyebrow">
+          <span className="swatch" style={{ backgroundColor: group.color }} />
+          <span>{group.name}</span>
+        </div>
+      )}
 
-          {group && (
-            <p
-              className="text-xs font-mono mt-1"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {'// '}{group.name}
-            </p>
-          )}
+      <h3 className="card-title">{task.title}</h3>
 
-          {keywords.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {keywords.map((keyword) => (
-                <span
-                  key={keyword.id}
-                  className="px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide"
-                  style={{
-                    backgroundColor: keyword.color + '15',
-                    color: keyword.color,
-                    border: '1px solid ' + keyword.color + '40'
-                  }}
-                >
-                  #{keyword.name}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* In Progress: show days in progress and deadline on same row */}
-          {task.status === 'inProgress' && (task.dateStarted || task.deadline) && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {task.dateStarted && (
-                <div
-                  className="flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded w-fit"
-                  style={{
-                    backgroundColor: 'rgba(45, 156, 219, 0.15)',
-                    color: '#2d9cdb',
-                    border: '1px solid rgba(45, 156, 219, 0.3)'
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12" />
-                  </svg>
-                  {getDaysInProgressLabel(getDaysInProgress(task.dateStarted))}
-                </div>
-              )}
-              {task.deadline && (() => {
-                const status = getDeadlineStatus(task.deadline);
-                const label = getDeadlineLabel(task.deadline, status);
-                const isOverdue = status === 'overdue';
-                const isSoon = status === 'soon' || status === 'today' || status === 'tomorrow';
-
-                return (
-                  <div
-                    className="flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded w-fit"
-                    style={{
-                      backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.15)' : isSoon ? 'rgba(234, 179, 8, 0.15)' : 'transparent',
-                      color: isOverdue ? '#ef4444' : isSoon ? '#ca8a04' : 'var(--text-tertiary)',
-                      border: isOverdue ? '1px solid rgba(239, 68, 68, 0.3)' : isSoon ? '1px solid rgba(234, 179, 8, 0.3)' : 'none'
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    {label}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {task.dateCompleted ? (
-            <div
-              className="flex items-center gap-1.5 mt-3 text-xs font-mono px-2 py-1 rounded w-fit"
+      {keywords.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {keywords.map((keyword) => (
+            <span
+              key={keyword.id}
+              className="chip"
               style={{
-                backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                color: '#22c55e',
-                border: '1px solid rgba(34, 197, 94, 0.3)'
+                color: keyword.color,
+                backgroundColor: 'color-mix(in srgb, ' + keyword.color + ' calc(var(--tint-alpha) * 100%), transparent)',
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              #{keyword.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {hasMeta && (
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          {showStarted && task.dateStarted && (
+            <span className="meta meta-progress">
+              <PlayIcon />
+              {getDaysInProgressLabel(getDaysInProgress(task.dateStarted))}
+            </span>
+          )}
+          {showDeadline && task.deadline && <DeadlineChip deadline={task.deadline} />}
+          {task.dateCompleted && (
+            <span className="meta meta-done">
+              <CheckIcon />
               {formatDate(task.dateCompleted)}
               {task.dateStarted && (
                 <span style={{ color: 'var(--text-tertiary)' }}>
                   {' · '}{getDaysInProgressLabel(getDaysInProgress(task.dateStarted, task.dateCompleted), true)}
                 </span>
               )}
-            </div>
-          ) : task.status !== 'inProgress' && task.deadline && (() => {
-            const status = getDeadlineStatus(task.deadline);
-            const label = getDeadlineLabel(task.deadline, status);
-            const isOverdue = status === 'overdue';
-            const isSoon = status === 'soon' || status === 'today' || status === 'tomorrow';
-
-            return (
-              <div
-                className="flex items-center gap-1.5 mt-3 text-xs font-mono px-2 py-1 rounded w-fit"
-                style={{
-                  backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.15)' : isSoon ? 'rgba(234, 179, 8, 0.15)' : 'transparent',
-                  color: isOverdue ? '#ef4444' : isSoon ? '#ca8a04' : 'var(--text-tertiary)',
-                  border: isOverdue ? '1px solid rgba(239, 68, 68, 0.3)' : isSoon ? '1px solid rgba(234, 179, 8, 0.3)' : 'none'
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                {label}
-              </div>
-            );
-          })()}
+            </span>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

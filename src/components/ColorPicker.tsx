@@ -48,7 +48,7 @@ export function ColorPicker({ selectedColor, onChange }: ColorPickerProps) {
             key={color}
             type="button"
             onClick={() => onChange(color)}
-            className="w-7 h-7 rounded-full transition-all duration-150 hover:scale-110 active:scale-95 focus:outline-none flex items-center justify-center"
+            className="w-6 h-6 rounded-full transition-transform duration-150 hover:scale-110 active:scale-95 flex items-center justify-center"
             style={{
               backgroundColor: color,
               boxShadow: isSelected 
@@ -60,8 +60,8 @@ export function ColorPicker({ selectedColor, onChange }: ColorPickerProps) {
           >
             {isSelected && (
               <svg
-                width="14"
-                height="14"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="white"

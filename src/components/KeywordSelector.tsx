@@ -3,6 +3,7 @@ import { useKeywordStore } from '../stores/keywordStore';
 import { useTaskStore } from '../stores/taskStore';
 import { KeywordTag } from './KeywordTag';
 import { ColorPicker } from './ColorPicker';
+import { CheckIcon, PlusIcon, TrashIcon } from './Icons';
 import type { Keyword } from '../types';
 
 /**
@@ -179,7 +180,7 @@ export function KeywordSelector({ selectedKeywordIds, onChange }: KeywordSelecto
     <div ref={containerRef} className="relative">
       {/* Selected Keywords */}
       {selectedKeywords.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-1.5 mb-2">
           {selectedKeywords.map((keyword) => (
             <KeywordTag
               key={keyword.id}
@@ -191,98 +192,44 @@ export function KeywordSelector({ selectedKeywordIds, onChange }: KeywordSelecto
       )}
 
       {/* Search Input */}
-      <div className="relative">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs" style={{ color: 'var(--text-tertiary)' }}>{'>'}</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={searchQuery}
-            onChange={handleInputChange}
-            onFocus={handleInputFocus}
-            onKeyDown={handleKeyDown}
-            placeholder="search_keywords..."
-            className="form-input font-mono text-xs"
-          />
-        </div>
-      </div>
+      <input
+        ref={inputRef}
+        type="text"
+        value={searchQuery}
+        onChange={handleInputChange}
+        onFocus={handleInputFocus}
+        onKeyDown={handleKeyDown}
+        placeholder="Search or add a keyword"
+        className="form-input"
+        aria-label="Search keywords"
+      />
 
       {/* Dropdown */}
       {isOpen && (
-        <div
-          className="absolute z-50 w-full mt-2 overflow-hidden animate-scale-in"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-primary)',
-            boxShadow: '4px 4px 0 var(--border-secondary)',
-          }}
-        >
+        <div className="menu left-0 right-0 animate-scale-in">
           {isCreating ? (
             /* Create New Keyword Form */
-            <div className="p-4">
-              <div className="mb-3">
-                <label
-                  className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'// new_keyword'}
-                </label>
-                <div
-                  className="flex items-center gap-2 px-3 py-2 font-mono text-xs"
-                  style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-primary)',
-                  }}
-                >
-                  <span
-                    className="w-3 h-3 flex-shrink-0"
-                    style={{ backgroundColor: newKeywordColor }}
-                  />
-                  <span style={{ color: 'var(--text-primary)' }}>
-                    #{searchQuery.trim()}
-                  </span>
-                </div>
+            <div className="menu-section">
+              <div className="flex items-center gap-2">
+                <span className="swatch" style={{ backgroundColor: newKeywordColor }} />
+                <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>
+                  #{searchQuery.trim()}
+                </span>
               </div>
-
-              <div className="mb-4">
-                <label
-                  className="block font-mono text-[10px] uppercase tracking-wider mb-2"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'// color'}
-                </label>
-                <ColorPicker
-                  selectedColor={newKeywordColor}
-                  onChange={setNewKeywordColor}
-                />
+              <div>
+                <span className="field-label">Color</span>
+                <ColorPicker selectedColor={newKeywordColor} onChange={setNewKeywordColor} />
               </div>
-
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsCreating(false);
-                    setSearchQuery('');
-                  }}
-                  className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors duration-200"
-                  style={{
-                    color: 'var(--text-secondary)',
-                    border: '1px solid var(--border-primary)',
-                  }}
+                  onClick={() => { setIsCreating(false); setSearchQuery(''); }}
+                  className="btn btn-sm"
                 >
-                  [ESC]
+                  Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCreateKeyword}
-                  className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-all duration-200"
-                  style={{
-                    backgroundColor: 'var(--text-primary)',
-                    color: 'var(--bg-primary)',
-                    border: '1px solid var(--text-primary)',
-                  }}
-                >
-                  [CREATE]
+                <button type="button" onClick={handleCreateKeyword} className="btn btn-primary btn-sm">
+                  Create
                 </button>
               </div>
             </div>
@@ -290,12 +237,7 @@ export function KeywordSelector({ selectedKeywordIds, onChange }: KeywordSelecto
             /* Keyword List */
             <div className="max-h-64 overflow-y-auto">
               {filteredKeywords.length === 0 && !searchQuery.trim() ? (
-                <div
-                  className="px-4 py-6 text-center font-mono text-xs"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'// no keywords. type to create.'}
-                </div>
+                <div className="menu-empty">No keywords yet. Type to create one.</div>
               ) : (
                 <>
                   {filteredKeywords.map((keyword) => {
@@ -305,49 +247,20 @@ export function KeywordSelector({ selectedKeywordIds, onChange }: KeywordSelecto
 
                     if (isEditing) {
                       return (
-                        <div
-                          key={keyword.id}
-                          className="px-4 py-3 border-b"
-                          style={{ borderColor: 'var(--border-primary)' }}
-                        >
-                          <div className="flex items-center gap-2 mb-3">
-                            <span
-                              className="w-3 h-3 flex-shrink-0"
-                              style={{ backgroundColor: editingColor }}
-                            />
+                        <div key={keyword.id} className="menu-section" style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="swatch" style={{ backgroundColor: editingColor }} />
                             <span className="font-mono text-xs" style={{ color: 'var(--text-primary)' }}>
                               #{keyword.name}
                             </span>
                           </div>
-                          <div className="mb-3">
-                            <ColorPicker
-                              selectedColor={editingColor}
-                              onChange={setEditingColor}
-                            />
-                          </div>
+                          <ColorPicker selectedColor={editingColor} onChange={setEditingColor} />
                           <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditingKeywordId(null)}
-                              className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider"
-                              style={{
-                                color: 'var(--text-secondary)',
-                                border: '1px solid var(--border-primary)',
-                              }}
-                            >
-                              [ESC]
+                            <button type="button" onClick={() => setEditingKeywordId(null)} className="btn btn-sm">
+                              Cancel
                             </button>
-                            <button
-                              type="button"
-                              onClick={handleSaveEdit}
-                              className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider"
-                              style={{
-                                backgroundColor: 'var(--text-primary)',
-                                color: 'var(--bg-primary)',
-                                border: '1px solid var(--text-primary)',
-                              }}
-                            >
-                              [SAVE]
+                            <button type="button" onClick={handleSaveEdit} className="btn btn-primary btn-sm">
+                              Save
                             </button>
                           </div>
                         </div>
@@ -355,66 +268,39 @@ export function KeywordSelector({ selectedKeywordIds, onChange }: KeywordSelecto
                     }
 
                     return (
-                      <div
-                        key={keyword.id}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 transition-colors duration-150 font-mono text-xs"
-                        style={{
-                          backgroundColor: isSelected
-                            ? 'var(--bg-secondary)'
-                            : 'transparent',
-                          opacity: isSelected ? 0.6 : 1,
-                          borderLeft: isSelected ? '2px solid var(--accent-done)' : '2px solid transparent',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                      >
+                      <div key={keyword.id} className="menu-item" aria-disabled={isSelected}>
                         <button
                           type="button"
                           onClick={() => handleStartEdit(keyword)}
-                          className="w-3 h-3 flex-shrink-0 hover:ring-2 hover:ring-offset-1 transition-all"
-                          style={{ backgroundColor: keyword.color }}
+                          className="swatch hover:ring-2 hover:ring-offset-1 transition-all"
+                          style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: keyword.color }}
                           title="Edit color"
+                          aria-label={'Edit color of ' + keyword.name}
                         />
                         <button
                           type="button"
                           onClick={() => handleSelectKeyword(keyword.id)}
                           disabled={isSelected}
-                          className="flex-1 text-left"
+                          className="flex-1 text-left truncate"
                           style={{ color: 'var(--text-primary)' }}
                         >
                           #{keyword.name}
                         </button>
-                        <span
-                          className="font-mono text-[10px]"
-                          style={{ color: 'var(--text-tertiary)' }}
-                        >
-                          ({usageCount})
-                        </span>
-                        {isSelected && (
-                          <span
-                            className="font-mono text-[10px]"
-                            style={{ color: 'var(--accent-done)' }}
-                          >
-                            [ADDED]
-                          </span>
+                        {isSelected ? (
+                          <CheckIcon style={{ color: 'var(--accent-done)' }} />
+                        ) : (
+                          <span className="side-count" style={{ marginLeft: 0 }}>{usageCount}</span>
                         )}
                         {usageCount === 0 && !isSelected && (
                           <button
                             type="button"
                             onClick={() => handleDeleteKeyword(keyword.id)}
-                            className="font-mono text-[10px] hover:opacity-80 transition-opacity"
-                            style={{ color: '#ff4444' }}
+                            className="icon-btn icon-btn-danger"
+                            style={{ width: 24, height: 24 }}
                             title="Delete unused keyword"
+                            aria-label={'Delete ' + keyword.name}
                           >
-                            [DEL]
+                            <TrashIcon size={14} />
                           </button>
                         )}
                       </div>
@@ -423,25 +309,13 @@ export function KeywordSelector({ selectedKeywordIds, onChange }: KeywordSelecto
 
                   {/* Create New Option */}
                   {searchQuery.trim() && !exactMatchExists && (
-                    <button
-                      type="button"
-                      onClick={handleShowCreateForm}
-                      className="w-full px-4 py-2.5 flex items-center gap-2 transition-colors duration-150 text-left border-t font-mono text-xs"
-                      style={{
-                        borderColor: 'var(--border-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <span style={{ color: 'var(--accent-done)' }}>[+]</span>
-                      <span style={{ color: 'var(--text-primary)' }}>
-                        create #{searchQuery.trim()}
-                      </span>
-                    </button>
+                    <>
+                      {filteredKeywords.length > 0 && <div className="menu-divider" />}
+                      <button type="button" onClick={handleShowCreateForm} className="menu-item">
+                        <PlusIcon style={{ color: 'var(--accent-done)' }} />
+                        <span>Create #{searchQuery.trim()}</span>
+                      </button>
+                    </>
                   )}
                 </>
               )}

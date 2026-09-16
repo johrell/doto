@@ -19,13 +19,16 @@ import { useTaskStore } from './stores/taskStore';
 import { useKeywordStore } from './stores/keywordStore';
 import { useGroupStore } from './stores/groupStore';
 import { useProjectStore } from './stores/projectStore';
+import { DataTransfer } from './components/DataTransfer';
 import { TaskForm } from './components/TaskForm';
 import { ConfirmModal } from './components/ConfirmModal';
-import { ProjectDropdown } from './components/ProjectDropdown';
+import { ProjectList } from './components/ProjectList';
+import { ChevronDownIcon, MoonIcon, PlusIcon, SearchIcon, XIcon } from './components/Icons';
 import { Column, TaskCard } from './components/Column';
 import { type QuickAddInputHandle } from './components/QuickAddInput';
 import { useTheme } from './hooks/useTheme';
 import { COLUMN_CONFIG } from './config/columns';
+import { matchesTaskFilters, type DeadlineFilter } from './utils/taskFilters';
 import { parseQuickAddInput } from './utils/taskParser';
 import type { Task, Keyword, Status, CreateTaskInput } from './types';
 
@@ -35,6 +38,12 @@ function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [query, setQuery] = useState('');
+  const [keywordFilter, setKeywordFilter] = useState('');
+  const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>('all');
+  const [deletedTasks, setDeletedTasks] = useState<Array<{ task: Task; allIndex: number; statusIndex: number; projectIds: string[] }>>([]);
+  const clearFilters = () => { setQuery(''); setKeywordFilter(''); setDeadlineFilter('all'); };
+  const hasFilters = !!query.trim() || !!keywordFilter || deadlineFilter !== 'all';
   const { theme, toggleTheme } = useTheme();
 
   const taskStore = useTaskStore();
@@ -57,6 +66,7 @@ function App() {
       if (
         tagName === 'input' ||
         tagName === 'textarea' ||
+        target.closest('button, a, select, [role="button"], [role="dialog"], [role="alertdialog"]') ||
         target.isContentEditable
       ) {
         return;
@@ -83,6 +93,8 @@ function App() {
   const currentProject = projectStore.getCurrentProject();
   const currentProjectTaskIds = currentProject?.taskIds ?? [];
 
+  useEffect(() => { clearFilters(); }, [currentProject?.id]);
+
   // Filter tasks by current project
   const tasksByStatus = useMemo(() => {
     const grouped: Record<Status, Task[]> = {
@@ -97,11 +109,12 @@ function App() {
       grouped[status] = taskIds
         .map((id) => taskStore.byId[id])
         .filter((task): task is Task => task !== undefined)
-        .filter((task) => currentProjectTaskIds.includes(task.id));
+        .filter((task) => currentProjectTaskIds.includes(task.id))
+        .filter((task) => matchesTaskFilters(task, query, keywordFilter, deadlineFilter, keywordStore.byId));
     }
 
     return grouped;
-  }, [taskStore.byId, taskStore.orderByStatus, currentProjectTaskIds]);
+  }, [taskStore.byId, taskStore.orderByStatus, currentProjectTaskIds, query, keywordFilter, deadlineFilter, keywordStore.byId]);
 
   const totalTasks = useMemo(() =>
     Object.values(tasksByStatus).reduce((sum, tasks) => sum + tasks.length, 0),
@@ -109,6 +122,29 @@ function App() {
   );
 
   const selectedTask = selectedTaskId ? taskStore.byId[selectedTaskId] : null;
+
+  // Header summary for the current project (unaffected by filters)
+  const summary = useMemo(() => {
+    const projectTasks = currentProjectTaskIds
+      .map((id) => taskStore.byId[id])
+      .filter((task): task is Task => task !== undefined);
+    return {
+      open: projectTasks.filter((task) => task.status !== 'finished').length,
+      inProgress: projectTasks.filter((task) => task.status === 'inProgress').length,
+      dueThisWeek: projectTasks.filter((task) => matchesTaskFilters(task, '', '', 'week', keywordStore.byId)).length,
+      overdue: projectTasks.filter((task) => matchesTaskFilters(task, '', '', 'overdue', keywordStore.byId)).length,
+    };
+  }, [currentProjectTaskIds, taskStore.byId, keywordStore.byId]);
+
+  // Change status from the task panel (appends to the end of the target column)
+  const handleStatusChange = useCallback(
+    (status: Status) => {
+      if (!selectedTaskId) return;
+      const destinationIndex = taskStore.orderByStatus[status].filter((id) => id !== selectedTaskId).length;
+      taskStore.moveTask(selectedTaskId, status, destinationIndex);
+    },
+    [selectedTaskId, taskStore]
+  );
 
   // Pointer-based collision detection
   const columnIds = ['todo', 'inProgress', 'finished'];
@@ -188,14 +224,15 @@ function App() {
 
       if (['todo', 'inProgress', 'finished'].includes(overId)) {
         destinationStatus = overId as Status;
-        destinationIndex = tasksByStatus[destinationStatus].length;
+        destinationIndex = taskStore.orderByStatus[destinationStatus].filter(id => id !== activeTaskId).length;
       } else {
         const overTask = taskStore.byId[overId];
         if (!overTask) return;
 
         destinationStatus = overTask.status;
-        const tasksInColumn = tasksByStatus[destinationStatus];
-        destinationIndex = tasksInColumn.findIndex((t) => t.id === overId);
+        if (activeTaskId === overId) return;
+        const tasksInColumn = taskStore.orderByStatus[destinationStatus];
+        destinationIndex = tasksInColumn.indexOf(overId);
         if (destinationIndex === -1) destinationIndex = tasksInColumn.length;
       }
 
@@ -330,10 +367,16 @@ function App() {
   // Confirm delete - removes task from store and project
   const handleConfirmDelete = useCallback(() => {
     if (selectedTaskId) {
-      // Remove task from project first
-      if (currentProject) {
-        projectStore.removeTaskFromProject(currentProject.id, selectedTaskId);
-      }
+      const task = taskStore.byId[selectedTaskId];
+      if (!task) return;
+      const projectIds = projectStore.allIds.filter(id => projectStore.byId[id].taskIds.includes(task.id));
+      setDeletedTasks(previous => [...previous, {
+        task,
+        allIndex: taskStore.allIds.indexOf(task.id),
+        statusIndex: taskStore.orderByStatus[task.status].indexOf(task.id),
+        projectIds,
+      }]);
+      for (const projectId of projectIds) projectStore.removeTaskFromProject(projectId, task.id);
 
       taskStore.deleteTask(selectedTaskId);
       setSelectedTaskId(null);
@@ -341,107 +384,123 @@ function App() {
     }
   }, [selectedTaskId, taskStore, currentProject, projectStore]);
 
+  const handleUndoDelete = () => {
+    const deleted = deletedTasks[deletedTasks.length - 1];
+    if (!deleted) return;
+    const projectIds = deleted.projectIds.filter(id => projectStore.byId[id]);
+    if (!projectIds.length) {
+      setDeletedTasks(previous => previous.slice(0, -1));
+      return;
+    }
+    taskStore.restoreTask(deleted.task, deleted.allIndex, deleted.statusIndex);
+    for (const id of projectIds) projectStore.addTaskToProject(id, deleted.task.id);
+    projectStore.setCurrentProject(projectIds[0]);
+    clearFilters();
+    setDeletedTasks(previous => previous.slice(0, -1));
+  };
+
   const handleCancelDelete = useCallback(() => {
     setShowDeleteConfirm(false);
   }, []);
 
   return (
-    <div
-      className="min-h-screen transition-colors duration-300"
-      style={{ backgroundColor: 'var(--bg-primary)' }}
-    >
-      {/* Header */}
-      <header
-        className="sticky top-0 z-40 backdrop-blur-md border-b"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 80%, transparent)',
-          borderColor: 'var(--border-primary)'
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-4">
-              <div className="flex items-center">
-                <span
-                  className="text-sm mr-2"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {'> '}
-                </span>
-                <h1
-                  className="font-display text-5xl tracking-wide"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  DOTO
-                </h1>
-                <span
-                  className="inline-block w-3 h-7 ml-1 animate-pulse"
-                  style={{ backgroundColor: 'var(--terminal-glow, var(--text-primary))' }}
-                />
-              </div>
-              <span
-                className="text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-                style={{
-                  color: 'var(--text-secondary)',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-primary)'
-                }}
-              >
-                [{totalTasks} {totalTasks === 1 ? 'task' : 'tasks'}]
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Project Dropdown */}
-              <ProjectDropdown />
-
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="px-3 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-primary)',
-                  boxShadow: '2px 2px 0 var(--border-secondary)',
-                  color: theme === 'light' ? 'var(--accent-todo)' : 'var(--terminal-glow)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '3px 3px 0 var(--border-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '2px 2px 0 var(--border-secondary)';
-                }}
-                aria-label={'Switch to ' + (theme === 'light' ? 'dark' : 'light') + ' mode'}
-              >
-                {theme === 'light' ? '[LIGHT]' : '[DARK]'}
-              </button>
-
-              {/* Add Task Button - Opens form in create mode */}
-              <button
-                onClick={handleOpenCreate}
-                className="px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0"
-                style={{
-                  backgroundColor: 'var(--text-primary)',
-                  color: 'var(--bg-primary)',
-                  border: '2px solid var(--text-primary)',
-                  boxShadow: '3px 3px 0 var(--border-secondary)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '5px 5px 0 var(--border-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '3px 3px 0 var(--border-secondary)';
-                }}
-              >
-                [+] New Task
-              </button>
-            </div>
-          </div>
+    <div className="app-shell">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="flex items-center gap-2.5 px-2.5 mb-6">
+          <span
+            className="inline-flex items-center justify-center w-7 h-7 rounded-md font-mono text-sm font-medium"
+            style={{ backgroundColor: 'var(--text-primary)', color: 'var(--bg-primary)' }}
+            aria-hidden="true"
+          >
+            d
+          </span>
+          <span className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Doto</span>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+        <ProjectList />
+
+        <div className="flex-1" />
+
+        <div className="flex flex-col gap-0.5 pt-3 mt-4" style={{ borderTop: '1px solid var(--border-primary)' }}>
+          <DataTransfer theme={theme} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={theme === 'dark'}
+            onClick={toggleTheme}
+            className="side-item"
+          >
+            <MoonIcon className="icon" />
+            Dark mode
+            <span className="switch ml-auto" aria-hidden="true">
+              <span className="switch-knob" />
+            </span>
+          </button>
+        </div>
+
+        <p className="px-2.5 pt-3.5 font-mono text-[11px] leading-4" style={{ color: 'var(--text-tertiary)' }}>
+          Stored in this browser.<br />No account, no sync.
+        </p>
+      </aside>
+
+      {/* Main */}
+      <div className="app-main">
+        <header className="topbar">
+          <div className="flex items-baseline gap-3.5 min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-tight whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
+              {currentProject?.name ?? 'Doto'}
+            </h1>
+            <p className="text-sm whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+              {summary.open} open · {summary.inProgress} in progress
+              {summary.dueThisWeek > 0 && <> · {summary.dueThisWeek} due this week</>}
+              {summary.overdue > 0 && <> · <span style={{ color: 'var(--danger)' }}>{summary.overdue} overdue</span></>}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5" role="search" aria-label="Filter tasks">
+            <label className="search-box">
+              <SearchIcon />
+              <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tasks" aria-label="Search tasks" />
+            </label>
+            <label className="filter">
+              <span>Label</span>
+              <select value={keywordFilter} onChange={e => setKeywordFilter(e.target.value)} aria-label="Filter by label">
+                <option value="">All</option>
+                {keywordStore.allIds.map(id => <option key={id} value={id}>{keywordStore.byId[id].name}</option>)}
+              </select>
+              <ChevronDownIcon className="icon" />
+            </label>
+            <label className="filter">
+              <span>Deadline</span>
+              <select value={deadlineFilter} onChange={e => setDeadlineFilter(e.target.value as DeadlineFilter)} aria-label="Filter by deadline">
+                <option value="all">Any</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Due today</option>
+                <option value="week">Next 7 days</option>
+                <option value="none">No deadline</option>
+              </select>
+              <ChevronDownIcon className="icon" />
+            </label>
+            {hasFilters && (
+              <button type="button" onClick={clearFilters} className="btn btn-ghost">
+                <XIcon />
+                Clear
+              </button>
+            )}
+            <button type="button" onClick={handleOpenCreate} className="btn btn-primary" style={{ paddingLeft: 10 }}>
+              <PlusIcon />
+              New task
+            </button>
+          </div>
+        </header>
+
+        {hasFilters && (
+          <p role="status" className="text-sm px-8 pt-5 -mb-2" style={{ color: 'var(--text-secondary)' }}>
+            {totalTasks === 0 ? 'No tasks match your filters.' : `Showing ${totalTasks} matching ${totalTasks === 1 ? 'task' : 'tasks'}.`}
+          </p>
+        )}
+
         <DndContext
           sensors={sensors}
           collisionDetection={collisionDetection}
@@ -450,11 +509,12 @@ function App() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <main className="board">
             {COLUMN_CONFIG.map((column, index) => (
               <Column
                 key={column.status}
                 config={column}
+                isFiltered={hasFilters}
                 tasks={tasksByStatus[column.status]}
                 keywordMap={keywordStore.byId}
                 groupMap={groupStore.byId}
@@ -465,7 +525,7 @@ function App() {
                 quickAddRef={column.status === 'todo' ? quickAddRef : undefined}
               />
             ))}
-          </div>
+          </main>
 
           <DragOverlay>
             {activeTask && (
@@ -480,7 +540,17 @@ function App() {
             )}
           </DragOverlay>
         </DndContext>
-      </main>
+      </div>
+
+      {deletedTasks.length > 0 && (
+        <div className="toast">
+          <span role="status" className="truncate">Deleted “{deletedTasks[deletedTasks.length - 1].task.title}”</span>
+          <button type="button" onClick={handleUndoDelete} className="underline">Undo</button>
+          <button type="button" onClick={() => setDeletedTasks([])} aria-label="Dismiss undo notification" className="inline-flex opacity-70 hover:opacity-100">
+            <XIcon />
+          </button>
+        </div>
+      )}
 
       {/* Task Form (edit mode) - Opens when clicking a task */}
       {selectedTask && (
@@ -490,7 +560,8 @@ function App() {
           onClose={handleCloseTaskForm}
           onSave={handleSaveEdit}
           onDelete={handleDeleteClick}
-          title="Edit Task"
+          onStatusChange={handleStatusChange}
+          title="Edit task"
         />
       )}
 
@@ -501,15 +572,15 @@ function App() {
           isOpen={isCreating}
           onClose={handleCloseCreate}
           onSave={handleSaveCreate}
-          title="New Task"
+          title="New task"
         />
       )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
-        title="Delete Task?"
-        message={'Are you sure you want to delete "' + (selectedTask?.title || '') + '"? This action cannot be undone.'}
+        title="Delete task?"
+        message={'"' + (selectedTask?.title || '') + '" will be deleted. You can undo this right after.'}
         confirmText="Delete"
         cancelText="Cancel"
         isDestructive={true}
